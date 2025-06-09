@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>لعبة شلاهبي يسرق الشيب</title>
+  <style>
+    body, html {
+      margin: 0; padding: 0; height: 100%; overflow: hidden;
+      background-color: #a3d977;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #game {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .character, .item, .mom, .farmer {
+      position: absolute;
+      user-select: none;
+    }
+    #shlahbi {
+      width: 80px;
+      height: 80px;
+      transition: transform 0.2s ease;
+    }
+    #mom {
+      width: 100px;
+      height: 100px;
+      bottom: 20px;
+      right: 20px;
+    }
+    .farmer {
+      width: 80px;
+      height: 80px;
+      transition: transform 0.2s ease;
+    }
+    .shib {
+      width: 50px;
+      height: 50px;
+      animation: float 1.5s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    #info, #timer {
+      position: fixed;
+      top: 10px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    #info { right: 10px; }
+    #timer { left: 10px; }
+
+    #gameover {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 0, 0, 0.8);
+      color: white;
+      padding: 30px 50px;
+      font-size: 32px;
+      border-radius: 12px;
+      display: none;
+      text-align: center;
+      z-index: 10000;
+    }
+
+    #startScreen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 36px;
+      flex-direction: column;
+      z-index: 9999;
+    }
+
+    #startScreen button {
+      margin-top: 20px;
+      font-size: 24px;
+      padding: 10px 30px;
+      border: none;
+      border-radius: 12px;
+      background-color: #f0c000;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div id="startScreen">
+  <div>مرحبا بك في لعبة شلاهبي 🧓</div>
+  <button onclick="startGame()">ابدأ اللعب</button>
+</div>
+
+<div id="game">
+  <img src="shlahbi.png" alt="شلاهبي" id="shlahbi" class="character" style="top: 200px; left: 200px;" />
+  <img src="mom.png" alt="أمه رهمه" id="mom" class="mom" />
+  <img src="farmer.png" alt="الفلاح" id="farmer1" class="farmer" style="top: 100px; left: 400px;" />
+  <img src="farmer.png" alt="الفلاح" id="farmer2" class="farmer" style="top: 300px; left: 600px;" />
+  <img src="shib.png" alt="الشيب" class="item shib" style="top: 120px; left: 450px;" />
+  <img src="shib.png" alt="الشيب" class="item shib" style="top: 350px; left: 620px;" />
+</div>
+
+<div id="info">الشيب المهدر: <span id="score">0</span></div>
+<div id="timer">الوقت: <span id="timeLeft">30</span>ث</div>
+<div id="gameover">انتهت اللعبة!<br />اضغط F5 لإعادة اللعب</div>
+
+<script>
+  const shlahbi = document.getElementById('shlahbi');
+  const mom = document.getElementById('mom');
+  const farmers = [document.getElementById('farmer1'), document.getElementById('farmer2')];
+  const shibs = document.querySelectorAll('.shib');
+  const scoreElem = document.getElementById('score');
+  const gameoverElem = document.getElementById('gameover');
+  const gameElem = document.getElementById('game');
+
+  // أصوات
+  const stealSound = new Audio('steal.mp3');
+  const deliverSound = new Audio('deliver.mp3');
+  const caughtSound = new Audio('caught.mp3');
+
+  let pos = { x: 200, y: 200 };
+  let speed = 5;
+  let keys = {};
+  let score = 0;
+  let carrying = false;
+  let timeLeft = 30;
+  let started = false;
+  let timerInterval;
+  let gameInterval;
+
+  const farmersOrigin = farmers.map(f => ({
+    x: parseFloat(f.style.left),
+    y: parseFloat(f.style.top),
+  }));
+
+  function getRandomPosition(minX, maxX, minY, maxY) {
+    return {
+      x: Math.random() * (maxX - minX) + minX,
+      y: Math.random() * (maxY - minY) + minY,
+    };
+  }
+
+  function distance(p1, p2) {
+    return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2);
+  }
+
+  function repositionShibs() {
+    const margin = 150;
+    const maxX = gameElem.clientWidth - 50;
+    const maxY = gameElem.clientHeight - 50;
+
+    shibs.forEach(shib => {
+      let posShib;
+      let tries = 0;
+      do {
+        posShib = getRandomPosition(0, maxX, 0, maxY);
+        tries++;
+        let distToShlahbi = distance(posShib, pos);
+        let distToFarmers = farmersOrigin.some(farmerPos => distance(posShib, farmerPos) < margin);
+        if (distToShlahbi > margin && !distToFarmers) break;
+      } while (tries < 100);
+
+      shib.style.left = posShib.x + 'px';
+      shib.style.top = posShib.y + 'px';
+    });
+  }
+
+  repositionShibs();
+
+  window.addEventListener('keydown', (e) => {
+    keys[e.key] = true;
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+  });
+
+  window.addEventListener('keyup', (e) => {
+    keys[e.key] = false;
+  });
+
+  function move() {
+    if (keys['ArrowUp']) pos.y -= speed;
+    if (keys['ArrowDown']) pos.y += speed;
+    if (keys['ArrowLeft']) {
+      pos.x -= speed;
+      shlahbi.style.transform = 'scaleX(-1)';
+    }
+    if (keys['ArrowRight']) {
+      pos.x += speed;
+      shlahbi.style.transform = 'scaleX(1)';
+    }
+
+    pos.x = Math.max(0, Math.min(gameElem.clientWidth - shlahbi.clientWidth, pos.x));
+    pos.y = Math.max(0, Math.min(gameElem.clientHeight - shlahbi.clientHeight, pos.y));
+
+    shlahbi.style.left = pos.x + 'px';
+    shlahbi.style.top = pos.y + 'px';
+  }
+
+  function isColliding(a, b) {
+    const rect1 = a.getBoundingClientRect();
+    const rect2 = b.getBoundingClientRect();
+    return !(
+      rect1.top > rect2.bottom ||
+      rect1.bottom < rect2.top ||
+      rect1.left > rect2.right ||
+      rect1.right < rect2.left
+    );
+  }
+
+  function stealShib() {
+    if (carrying) return false;
+    for (let shib of shibs) {
+      if (shib.style.display !== 'none' && isColliding(shlahbi, shib)) {
+        carrying = true;
+        shib.style.display = 'none';
+        stealSound.play();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function deliverShib() {
+    if (!carrying) return false;
+    if (isColliding(shlahbi, mom)) {
+      carrying = false;
+      score++;
+      scoreElem.textContent = score;
+      deliverSound.play();
+      if (score === shibs.length) {
+        alert('مبروك! هدرّت كل الشيب لأمك رهمه 🎉');
+        location.reload();
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function moveFarmerToward(farmer, targetX, targetY) {
+    let farmerX = parseFloat(farmer.style.left);
+    let farmerY = parseFloat(farmer.style.top);
+    let dx = targetX - farmerX;
+    let dy = targetY - farmerY;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+    let farmerSpeed = 2;
+
+    if (dist > 1) {
+      farmer.style.left = (farmerX + (dx / dist) * farmerSpeed) + 'px';
+      farmer.style.top = (farmerY + (dy / dist) * farmerSpeed) + 'px';
+
+      farmer.style.transform = dx < 0 ? 'scaleX(-1)' : 'scaleX(1)';
+    }
+  }
+
+  function updateFarmers() {
+    if (carrying) {
+      farmers.forEach(farmer => moveFarmerToward(farmer, pos.x, pos.y));
+    } else {
+      farmers.forEach((farmer, i) => moveFarmerToward(farmer, farmersOrigin[i].x, farmersOrigin[i].y));
+    }
+  }
+
+  function checkFarmersCollision() {
+    for (let farmer of farmers) {
+      if (isColliding(shlahbi, farmer)) {
+        caughtSound.play();
+        gameoverElem.style.display = 'block';
+        clearInterval(timerInterval);
+        cancelAnimationFrame(gameInterval);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === ' ') {
+      stealShib();
+      deliverShib();
+    }
+  });
+
+  function gameLoop() {
+    if (!started) return;
+    move();
+    updateFarmers();
+    if (!checkFarmersCollision()) {
+      gameInterval = requestAnimationFrame(gameLoop);
+    }
+  }
+
+  function startTimer() {
+    document.getElementById('timeLeft').textContent = timeLeft;
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      document.getElementById('timeLeft').textContent = timeLeft;
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        gameoverElem.textContent = 'الوقت سالا! شلاهبي تفركع 😢';
+        gameoverElem.style.display = 'block';
+        cancelAnimationFrame(gameInterval);
+      }
+    }, 1000);
+  }
+
+  function startGame() {
+    document.getElementById('startScreen').style.display = 'none';
+    started = true;
+    startTimer();
+    gameInterval = requestAnimationFrame(gameLoop);
+  }
+</script>
+
+</body>
+</html>
