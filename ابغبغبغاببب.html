@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>شلاهبي يسرق الشيب</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Tahoma', sans-serif;
+      background-color: #222;
+      color: white;
+      text-align: center;
+    }
+    canvas {
+      display: block;
+      background: #444;
+      margin: 0 auto;
+      border: 2px solid white;
+    }
+    #startScreen, #gameover {
+      position: absolute;
+      top: 30%;
+      width: 100%;
+      font-size: 2rem;
+    }
+    #mobileWarning {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #000000cc;
+      color: white;
+      font-size: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+      padding: 20px;
+    }
+    #mobileControls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 20px;
+      z-index: 1000;
+    }
+    .mobile-btn {
+      width: 70px;
+      height: 70px;
+      background: #ff9800;
+      border-radius: 50%;
+      border: none;
+      font-size: 2rem;
+      color: white;
+      font-weight: bold;
+      touch-action: manipulation;
+    }
+  </style>
+</head>
+<body>
+
+<div id="mobileWarning">
+  ⚠️ رجاءً أدر هاتفك أفقياً للعب اللعبة.
+</div>
+
+<div id="startScreen">إضغط أي زر باش تبدا ⬅️⬆️⬇️➡️</div>
+<canvas id="gameCanvas" width="480" height="320"></canvas>
+<div id="gameover" style="display:none">اللعبة سالات! 😵</div>
+
+<div id="mobileControls" style="display:none">
+  <button class="mobile-btn" id="btnLeft">⬅️</button>
+  <button class="mobile-btn" id="btnUp">⬆️</button>
+  <button class="mobile-btn" id="btnDown">⬇️</button>
+  <button class="mobile-btn" id="btnRight">➡️</button>
+</div>
+
+<script>
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+
+  let player = { x: 50, y: 50, size: 20 };
+  let sheb = { x: 200, y: 150, size: 20 };
+  let started = false;
+  let gameOver = false;
+  let speed = 4;
+
+  const keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
+
+  document.addEventListener("keydown", (e) => {
+    keys[e.key] = true;
+    if (!started) {
+      started = true;
+      document.getElementById("startScreen").style.display = "none";
+      gameLoop();
+    }
+  });
+
+  document.addEventListener("keyup", (e) => {
+    keys[e.key] = false;
+  });
+
+  function movePlayer() {
+    if (keys.ArrowLeft) player.x -= speed;
+    if (keys.ArrowRight) player.x += speed;
+    if (keys.ArrowUp) player.y -= speed;
+    if (keys.ArrowDown) player.y += speed;
+  }
+
+  function drawPlayer() {
+    ctx.fillStyle = "orange";
+    ctx.fillRect(player.x, player.y, player.size, player.size);
+  }
+
+  function drawSheb() {
+    ctx.fillStyle = "white";
+    ctx.fillRect(sheb.x, sheb.y, sheb.size, sheb.size);
+  }
+
+  function checkCollision() {
+    if (
+            player.x < sheb.x + sheb.size &&
+            player.x + player.size > sheb.x &&
+            player.y < sheb.y + sheb.size &&
+            player.y + player.size > sheb.y
+    ) {
+      gameOver = true;
+      document.getElementById("gameover").style.display = "block";
+    }
+  }
+
+  function gameLoop() {
+    if (gameOver) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    movePlayer();
+    drawPlayer();
+    drawSheb();
+    checkCollision();
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function setupMobileControls() {
+    document.getElementById("mobileControls").style.display = "flex";
+
+    const btns = {
+      btnLeft: "ArrowLeft",
+      btnRight: "ArrowRight",
+      btnUp: "ArrowUp",
+      btnDown: "ArrowDown",
+    };
+
+    for (let id in btns) {
+      const key = btns[id];
+      const btn = document.getElementById(id);
+      btn.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        keys[key] = true;
+        if (!started) {
+          started = true;
+          document.getElementById("startScreen").style.display = "none";
+          gameLoop();
+        }
+      });
+      btn.addEventListener("touchend", (e) => {
+        e.preventDefault();
+        keys[key] = false;
+      });
+    }
+  }
+
+  function isMobileDevice() {
+    return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  }
+
+  window.onload = () => {
+    if (isMobileDevice()) {
+      document.getElementById("mobileWarning").style.display = "flex";
+      document.getElementById("startScreen").style.display = "none";
+      setupMobileControls();
+    }
+  };
+</script>
+</body>
+</html>
